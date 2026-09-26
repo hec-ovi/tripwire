@@ -55,12 +55,21 @@ impl<W: Write> Log<W> {
         }
         let hash = sha256_hex(&record.to_string());
         record["hash"] = hash.clone().into();
-        writeln!(self.out, "{record}")?;
-        self.out.flush()?;
+        write_line(&mut self.out, &record)?;
         self.seq += 1;
         self.prev = hash;
         Ok(())
     }
+}
+
+/// Write `value` and a newline in one `write_all`, then flush. Formatting straight
+/// into the writer would issue a write per JSON token, and a process killed
+/// mid-record would leave a torn line.
+pub fn write_line(out: &mut impl Write, value: &Value) -> io::Result<()> {
+    let mut line = value.to_string();
+    line.push('\n');
+    out.write_all(line.as_bytes())?;
+    out.flush()
 }
 
 fn sha256_hex(text: &str) -> String {
@@ -170,6 +179,24 @@ mod tests {
     fn garbage_line_is_detected() {
         let text = format!("{}not json\n", sample());
         assert_eq!(verify_err(&text), "line 4: not valid JSON");
+    }
+
+    #[test]
+    fn each_record_is_a_single_write() {
+        struct Writes(usize);
+        impl Write for Writes {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                self.0 += 1;
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        let mut log = Log::new(Writes(0));
+        let msg = json!({"jsonrpc": "2.0", "id": 1, "result": {"tools": [{"name": "a"}]}});
+        log.append(SERVER_TO_CLIENT, "message", &msg, None).unwrap();
+        assert_eq!(log.out.0, 1);
     }
 
     #[test]

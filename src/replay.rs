@@ -4,7 +4,7 @@
 //! alone, since client info differs between clients). Repeated requests get
 //! the recorded responses in order, then the last one again.
 
-use crate::log::{CLIENT_TO_SERVER, SERVER_TO_CLIENT};
+use crate::log::{CLIENT_TO_SERVER, SERVER_TO_CLIENT, write_line};
 use anyhow::Result;
 use serde_json::{Value, json};
 use std::collections::{HashMap, VecDeque};
@@ -79,8 +79,7 @@ pub fn serve(mut replay: Replay, input: impl BufRead, mut output: impl Write) ->
             })),
         };
         if let Some(reply) = reply {
-            writeln!(output, "{reply}")?;
-            output.flush()?;
+            write_line(&mut output, &reply)?;
         }
     }
     Ok(())

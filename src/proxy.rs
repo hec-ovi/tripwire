@@ -3,7 +3,7 @@
 //! Each line is parsed and the re-serialized value is what gets logged and
 //! forwarded, so the server only ever sees what the gate evaluated.
 
-use crate::log::{CLIENT_TO_SERVER, Log, SERVER_TO_CLIENT, TRIPWIRE_TO_CLIENT};
+use crate::log::{CLIENT_TO_SERVER, Log, SERVER_TO_CLIENT, TRIPWIRE_TO_CLIENT, write_line};
 use crate::policy::Policy;
 use anyhow::Result;
 use serde_json::{Value, json};
@@ -32,8 +32,7 @@ impl<L: Write, C: Write> Shared<L, C> {
         let mut log = self.log.lock().unwrap();
         log.append(CLIENT_TO_SERVER, kind, msg, Some(reason))?;
         log.append(TRIPWIRE_TO_CLIENT, "message", &reply, None)?;
-        writeln!(client, "{reply}")?;
-        client.flush()
+        write_line(&mut *client, &reply)
     }
 }
 
@@ -124,8 +123,7 @@ fn client_pump<L: Write, C: Write>(
             pending.insert(id.to_string(), method.to_string());
         }
         sh.log(CLIENT_TO_SERVER, "message", &msg, None)?;
-        writeln!(server, "{msg}")?;
-        server.flush()?;
+        write_line(&mut server, &msg)?;
     }
     Ok(())
 }
@@ -153,8 +151,7 @@ fn server_pump<L: Write, C: Write>(sh: &Shared<L, C>, input: impl BufRead) -> Re
         }
         let mut client = sh.client.lock().unwrap();
         sh.log(SERVER_TO_CLIENT, "message", &msg, None)?;
-        writeln!(client, "{msg}")?;
-        client.flush()?;
+        write_line(&mut *client, &msg)?;
     }
     Ok(())
 }
