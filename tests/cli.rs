@@ -78,12 +78,22 @@ fn record_replay_verify_and_tamper() {
             .status
             .success()
     );
+    let recorded = fs::read_to_string(&new).unwrap();
+    let cut = path("cut.jsonl");
+    let lines: Vec<&str> = recorded.lines().collect();
+    fs::write(&cut, lines[..lines.len() - 1].join("\n") + "\n").unwrap();
+    let zeros = "0".repeat(64);
+    for (log, head) in [(&cut, head), (&new, zeros.as_str())] {
+        let out = tripwire(&["verify", log, "--head", head], "");
+        assert_eq!(out.status.code(), Some(1));
+        let err = String::from_utf8(out.stderr).unwrap();
+        assert!(err.contains("the log was truncated or extended"), "{err}");
+    }
     assert!(
         !tripwire(&run, &input).status.success(),
         "must not overwrite a log"
     );
 
-    let recorded = fs::read_to_string(&new).unwrap();
     let line = recorded.lines().position(|l| l.contains("hello")).unwrap() + 1;
     fs::write(&new, recorded.replace("hello", "hellp")).unwrap();
     for args in [["verify", &new], ["replay", &new]] {
