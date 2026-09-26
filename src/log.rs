@@ -86,6 +86,10 @@ pub fn verify(text: &str) -> Result<Vec<Value>> {
     for (i, line) in text.split_terminator('\n').enumerate() {
         let lineno = i + 1;
         let Ok(mut record) = serde_json::from_str::<Value>(line) else {
+            let last = lineno == text.split_terminator('\n').count();
+            if last && !text.ends_with('\n') {
+                bail!("line {lineno}: incomplete last record, the writer was interrupted");
+            }
             bail!("line {lineno}: not valid JSON");
         };
         let Some(Value::String(hash)) = record.as_object_mut().and_then(|r| r.remove("hash"))
@@ -186,6 +190,16 @@ mod tests {
     fn garbage_line_is_detected() {
         let text = format!("{}not json\n", sample());
         assert_eq!(verify_err(&text), "line 4: not valid JSON");
+    }
+
+    #[test]
+    fn interrupted_last_record_is_reported_as_incomplete() {
+        let text = sample();
+        let torn = &text[..text.len() - 10];
+        assert_eq!(
+            verify_err(torn),
+            "line 3: incomplete last record, the writer was interrupted"
+        );
     }
 
     #[test]

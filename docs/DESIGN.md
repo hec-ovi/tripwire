@@ -34,7 +34,9 @@
 - **Write-ahead.** A message is logged before it is forwarded or delivered.
   If a log write fails, the message is not sent and that direction stops
   (the server's stdin is closed, or tripwire exits), so nothing crosses
-  unrecorded.
+  unrecorded. Each record goes out in a single write; if tripwire is killed
+  mid-write anyway, `verify` names the torn last line as an incomplete
+  record rather than an edit.
 - **Chained.** Each record stores the SHA-256 of its own canonical JSON
   (sorted keys, no whitespace, `hash` left out) and the previous record's
   hash. `verify` recomputes both and checks `seq` runs 0, 1, 2, ... so an

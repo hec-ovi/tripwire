@@ -68,7 +68,9 @@ tripwire replay <session.jsonl>
   closes stdin.
 - `verify` checks the hash chain and prints `ok: <n> records, head <hash>`,
   or the first bad line and exits 1. `--head` also requires the last hash to
-  match, which is the only way to detect lines cut from the end.
+  match, which is the only way to detect lines cut from the end. If
+  tripwire was killed while writing a record, `verify` reports an
+  incomplete last record; the records before it are intact.
 - `replay` verifies the log, then answers requests from it: matched on
   method and exact params (`initialize` on method alone), with the id of the
   new request. Repeated requests get the recorded responses in order, then
