@@ -49,7 +49,8 @@ does. A `deny` rule denies. An `allow` rule denies when any `deny_args`
 regex matches any string in the arguments (nested values and object keys
 included), or once it has allowed `max_calls` calls. A denied call is
 answered by tripwire as a tool error (`isError: true`, text
-`tripwire: blocked by policy: <reason>`), so the agent can carry on. Tools
+`tripwire: blocked by policy: <reason>`), so the agent can carry on; one
+sent as a notification, without an id, is dropped unanswered. Tools
 denied by name alone are also removed from `tools/list` responses. Unknown
 keys and invalid regexes stop tripwire at startup; there is no implicit
 allow. [examples/policy.toml](examples/policy.toml) is a commented policy

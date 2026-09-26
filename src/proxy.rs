@@ -104,10 +104,15 @@ fn client_pump<L: Write, C: Write>(
                 None => (false, "tools/call without a string params.name".to_string()),
             };
             if !allowed {
+                let Some(id) = msg.get("id") else {
+                    // A notification gets no reply, not even a refusal.
+                    sh.log(CLIENT_TO_SERVER, "deny", &msg, Some(&reason))?;
+                    continue;
+                };
                 let text = format!("tripwire: blocked by policy: {reason}");
                 let reply = json!({
                     "jsonrpc": "2.0",
-                    "id": msg["id"],
+                    "id": id,
                     "result": {"content": [{"type": "text", "text": text}], "isError": true},
                 });
                 sh.refuse(&msg, "deny", &reason, reply)?;
@@ -261,10 +266,12 @@ mod tests {
     #[test]
     fn denied_calls_never_reach_the_server() {
         let no_name = r#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":7}}"#;
+        let notification = r#"{"jsonrpc":"2.0","method":"tools/call","params":{"name":"shell"}}"#;
         let s = session(&[
             &call(1, "shell", json!({"cmd": "id"})),
             &call(2, "read_file", json!({"path": "/home/u/.ssh/id_rsa"})),
             no_name,
+            notification,
         ]);
         assert_eq!(s.server.text(), "");
         assert_eq!(s.client.len(), 3);
@@ -279,6 +286,8 @@ mod tests {
         assert_eq!(kinds[0], (&json!("client_to_server"), &json!("deny")));
         assert_eq!(kinds[1], (&json!("tripwire_to_client"), &json!("message")));
         assert_eq!(records[0]["reason"], r#"rule 1 ("shell") denies this tool"#);
+        assert_eq!(records.len(), 7, "the notification is logged, not answered");
+        assert_eq!(records[6]["kind"], "deny");
     }
 
     #[test]

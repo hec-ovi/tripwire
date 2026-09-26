@@ -24,7 +24,9 @@
   2025-06-18 and would let a `tools/call` ride past the gate.
 - **I3 Denied calls never reach the server.** tripwire answers a denied
   `tools/call` itself, with the request's id and an MCP tool error, so the
-  agent can continue. A call without a string `params.name` is denied.
+  agent can continue. A call without a string `params.name` is denied. A
+  denied call sent as a notification (no id) is logged and dropped, since
+  JSON-RPC forbids replying to a notification.
 - **I4 Least privilege in discovery.** `tools/list` responses lose the tools
   the policy denies by name alone. Tools that are denied only for some
   arguments stay listed. Every server result with a `tools` array is
