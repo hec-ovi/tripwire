@@ -1,0 +1,62 @@
+# Example policy for an agent with filesystem, fetch and shell MCP servers.
+# Run each server behind its own tripwire; they can share this file.
+#
+# The first rule whose `tool` matches decides. Tool names are case-sensitive
+# and `*` matches any run of characters. deny_args regexes are checked
+# against every string in the call's arguments (keys too), exactly as sent:
+# paths are not normalized, so `..` is refused rather than resolved.
+
+# Anything not allowed below is denied, and hidden from tools/list.
+default = "deny"
+
+# Shell and command execution: one injected instruction away from anything.
+# The default would deny these too; the explicit rules give a clear reason.
+[[rule]]
+tool = "*shell*"
+action = "deny"
+
+[[rule]]
+tool = "*exec*"
+action = "deny"
+
+[[rule]]
+tool = "run_*"
+action = "deny"
+
+# fetch can send anything to any URL. deny_args can only deny, so a list of
+# allowed hosts cannot be expressed; refuse fetch outright.
+[[rule]]
+tool = "fetch"
+action = "deny"
+
+# Reads (read_file, read_text_file, read_multiple_files, ...) minus secrets.
+[[rule]]
+tool = "read_*"
+action = "allow"
+deny_args = [
+  '(^|/)\.\.(/|$)',       # parent directory
+  '(^|/)\.ssh(/|$)',
+  '(^|/)\.aws(/|$)',
+  '(^|/)\.gnupg(/|$)',
+  '(^|/)\.env(\.|$)',     # .env, .env.production
+  'id_(rsa|ecdsa|ed25519)',
+]
+max_calls = 100
+
+[[rule]]
+tool = "list_directory"
+action = "allow"
+deny_args = ['(^|/)\.\.(/|$)', '(^|/)\.ssh(/|$)', '(^|/)\.aws(/|$)', '(^|/)\.gnupg(/|$)']
+
+# Writes stay inside the project: relative paths only, no dotfiles
+# (.bashrc, .git/hooks, .env). These patterns also see the file content, so
+# a harmless write can be refused; that errs on the safe side.
+[[rule]]
+tool = "write_file"
+action = "allow"
+deny_args = [
+  '^[~/]',                # absolute or home-relative path
+  '(^|/)\.\.(/|$)',       # parent directory
+  '(^|/)\.[A-Za-z]',      # dotfiles and dot-directories
+]
+max_calls = 20
