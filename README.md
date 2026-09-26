@@ -65,8 +65,11 @@ tripwire replay <session.jsonl>
 ```
 
 - `run` starts the server and proxies the agent's stdin/stdout to it. It
-  exits with the server's exit code when the server exits or after the agent
-  closes stdin.
+  runs until the server's stdout closes, then waits for the server and exits
+  with its exit code (1 if a signal killed it). When the agent closes stdin,
+  tripwire closes the server's stdin and waits for the server to exit. A
+  background process that inherited the server's stdout keeps the session
+  open until it exits too.
 - `verify` checks the hash chain and prints `ok: <n> records, head <hash>`,
   or the first bad line and exits 1. `--head` also requires the last hash to
   match, which is the only way to detect lines cut from the end. If

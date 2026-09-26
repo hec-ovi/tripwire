@@ -76,4 +76,9 @@
 - **Replay beyond exact matches.** Replay matches method and exact params, so
   a request that differs in any field, `_meta` included, gets -32001 rather
   than a guess.
+- **Watching the server process.** A session ends when the server's stdout
+  closes, not when the process tripwire started exits: a wrapper may exit
+  while the process it launched still holds the pipe and can still send
+  messages. tripwire does not kill a server that ignores stdin closing;
+  stopping it is the agent host's job.
 - **An async runtime.** One client and one server need two blocking threads.

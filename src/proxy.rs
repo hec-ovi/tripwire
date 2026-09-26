@@ -33,8 +33,9 @@ impl<L: Write, C: Write> Shared<L, C> {
     }
 }
 
-/// Run the proxy until the server closes its output. The client pump is not
-/// joined: if the server exits we return even if the client never closes stdin.
+/// Run the proxy until the server closes its output, which is what ends a
+/// session, even if the server process exited earlier. The client pump is not
+/// joined, so we return even if the client never closes stdin.
 pub fn run<L, CI, CO, SI, SO>(
     policy: Policy,
     log: L,
