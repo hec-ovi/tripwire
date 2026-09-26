@@ -2,3 +2,4 @@
 
 pub mod log;
 pub mod policy;
+pub mod proxy;
