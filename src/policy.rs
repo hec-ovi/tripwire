@@ -118,10 +118,7 @@ impl Policy {
             .iter()
             .find(|re| strings.iter().any(|s| re.is_match(s)))
         {
-            return deny(format!(
-                "{name}: an argument matches deny_args {:?}",
-                re.as_str()
-            ));
+            return deny(format!("{name}: an argument matches deny_args '{re}'"));
         }
         if rule.max_calls.is_some_and(|max| rule.calls >= max) {
             return deny(format!("{name}: max_calls reached"));

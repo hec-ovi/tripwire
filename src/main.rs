@@ -13,6 +13,7 @@ use tripwire::{log, policy::Policy, proxy};
 enum Cli {
     /// Run an MCP server behind the policy gate, logging every message.
     Run {
+        /// Policy file (TOML).
         #[arg(long)]
         policy: PathBuf,
         /// Session log to create; must not exist yet.
