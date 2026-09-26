@@ -25,13 +25,17 @@ enum Cli {
     },
     /// Check a session log's hash chain.
     Verify {
+        /// Session log written by `tripwire run`.
         log: PathBuf,
         /// Also require the last record's hash to equal this (detects a truncated tail).
         #[arg(long)]
         head: Option<String>,
     },
     /// Serve a verified session log as an MCP server on stdin/stdout.
-    Replay { log: PathBuf },
+    Replay {
+        /// Session log written by `tripwire run`.
+        log: PathBuf,
+    },
 }
 
 fn main() -> ExitCode {
