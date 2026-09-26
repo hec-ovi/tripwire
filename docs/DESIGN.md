@@ -27,7 +27,9 @@
   agent can continue. A call without a string `params.name` is denied.
 - **I4 Least privilege in discovery.** `tools/list` responses lose the tools
   the policy denies by name alone. Tools that are denied only for some
-  arguments stay listed.
+  arguments stay listed. Every server result with a `tools` array is
+  filtered, not only the one matched to a `tools/list` request by id, so a
+  reused or renumbered id cannot let the full list through.
 
 ## Log invariants
 

@@ -7,7 +7,6 @@ use crate::log::{CLIENT_TO_SERVER, Log, SERVER_TO_CLIENT, TRIPWIRE_TO_CLIENT, wr
 use crate::policy::Policy;
 use anyhow::Result;
 use serde_json::{Value, json};
-use std::collections::HashMap;
 use std::io::{self, BufRead, Write};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -17,8 +16,6 @@ struct Shared<L, C> {
     log: Mutex<Log<L>>,
     /// Lock order: `client` before `log`, so log order matches what the client receives.
     client: Mutex<C>,
-    /// Client request id (canonical JSON) -> method, to recognize `tools/list` responses.
-    pending: Mutex<HashMap<String, String>>,
 }
 
 impl<L: Write, C: Write> Shared<L, C> {
@@ -57,7 +54,6 @@ where
         policy: Mutex::new(policy),
         log: Mutex::new(Log::new(log)),
         client: Mutex::new(client_out),
-        pending: Mutex::new(HashMap::new()),
     });
     let client_side = Arc::clone(&shared);
     thread::spawn(move || {
@@ -118,10 +114,6 @@ fn client_pump<L: Write, C: Write>(
                 continue;
             }
         }
-        if let (Some(id), Some(method)) = (msg.get("id"), msg["method"].as_str()) {
-            let mut pending = sh.pending.lock().unwrap();
-            pending.insert(id.to_string(), method.to_string());
-        }
         sh.log(CLIENT_TO_SERVER, "message", &msg, None)?;
         write_line(&mut server, &msg)?;
     }
@@ -139,15 +131,15 @@ fn server_pump<L: Write, C: Write>(sh: &Shared<L, C>, input: impl BufRead) -> Re
             sh.log(SERVER_TO_CLIENT, "rejected", &raw, Some("unparseable JSON"))?;
             continue;
         };
-        if let (Some(id), None) = (msg.get("id"), msg.get("method")) {
-            let method = sh.pending.lock().unwrap().remove(&id.to_string());
-            let tools = msg
-                .pointer_mut("/result/tools")
-                .and_then(Value::as_array_mut);
-            if let (Some("tools/list"), Some(tools)) = (method.as_deref(), tools) {
-                let policy = sh.policy.lock().unwrap();
-                tools.retain(|t| t["name"].as_str().is_some_and(|n| !policy.hides(n)));
-            }
+        // Filter every result that carries a tools array instead of matching the
+        // response to a tools/list request by id: a reused id, or one the server
+        // renumbered (1.0 echoed as 1), would let denied tools through.
+        if let Some(tools) = msg
+            .pointer_mut("/result/tools")
+            .and_then(Value::as_array_mut)
+        {
+            let policy = sh.policy.lock().unwrap();
+            tools.retain(|t| t["name"].as_str().is_some_and(|n| !policy.hides(n)));
         }
         let mut client = sh.client.lock().unwrap();
         sh.log(SERVER_TO_CLIENT, "message", &msg, None)?;
@@ -296,6 +288,20 @@ mod tests {
             s.client[0]["result"]["tools"],
             json!([{"name": "read_file"}])
         );
+    }
+
+    #[test]
+    fn tools_list_is_filtered_even_when_its_id_is_reused() {
+        let s = session(&[
+            r#"{"jsonrpc":"2.0","id":5,"method":"tools/list"}"#,
+            r#"{"jsonrpc":"2.0","id":5,"method":"ping"}"#,
+        ]);
+        let lists: Vec<_> = s
+            .client
+            .iter()
+            .filter_map(|m| m["result"].get("tools"))
+            .collect();
+        assert_eq!(lists, [&json!([{"name": "read_file"}])]);
     }
 
     #[test]
