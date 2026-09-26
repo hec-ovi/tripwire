@@ -3,3 +3,4 @@
 pub mod log;
 pub mod policy;
 pub mod proxy;
+pub mod replay;

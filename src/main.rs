@@ -4,6 +4,7 @@ use std::fs::OpenOptions;
 use std::io::{self, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
+use tripwire::replay::{self, Replay};
 use tripwire::{log, policy::Policy, proxy};
 
 /// Policy gate and tamper-evident recorder for MCP stdio servers.
@@ -28,6 +29,8 @@ enum Cli {
         #[arg(long)]
         head: Option<String>,
     },
+    /// Serve a verified session log as an MCP server on stdin/stdout.
+    Replay { log: PathBuf },
 }
 
 fn main() -> ExitCode {
@@ -38,6 +41,7 @@ fn main() -> ExitCode {
             server,
         } => run(&policy, &log, &server),
         Cli::Verify { log, head } => verify(&log, head.as_deref()),
+        Cli::Replay { log } => replay(&log),
     };
     match result {
         Ok(code) => code,
@@ -89,5 +93,11 @@ fn verify(path: &Path, expected_head: Option<&str>) -> Result<ExitCode> {
         bail!("head is {head}, expected {expected}: the log was truncated or extended");
     }
     println!("ok: {} records, head {head}", records.len());
+    Ok(ExitCode::SUCCESS)
+}
+
+fn replay(path: &Path) -> Result<ExitCode> {
+    let records = read_verified(path)?;
+    replay::serve(Replay::new(&records), io::stdin().lock(), io::stdout())?;
     Ok(ExitCode::SUCCESS)
 }
