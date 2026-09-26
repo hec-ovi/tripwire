@@ -83,7 +83,7 @@ fn sha256_hex(text: &str) -> String {
 pub fn verify(text: &str) -> Result<Vec<Value>> {
     let mut records = Vec::new();
     let mut prev = GENESIS.to_string();
-    for (i, line) in text.lines().enumerate() {
+    for (i, line) in text.split_terminator('\n').enumerate() {
         let lineno = i + 1;
         let Ok(mut record) = serde_json::from_str::<Value>(line) else {
             bail!("line {lineno}: not valid JSON");
@@ -102,6 +102,13 @@ pub fn verify(text: &str) -> Result<Vec<Value>> {
             bail!("line {lineno}: hash mismatch, record was modified");
         }
         record["hash"] = hash.clone().into();
+        // The hash covers the parsed record, so the bytes must be exactly what
+        // the writer emitted: a duplicate key would otherwise show one record
+        // to a first-wins reader and hash another.
+        let canonical = record.to_string();
+        if line != canonical {
+            bail!("line {lineno}: not in canonical form");
+        }
         records.push(record);
         prev = hash;
     }
@@ -179,6 +186,18 @@ mod tests {
     fn garbage_line_is_detected() {
         let text = format!("{}not json\n", sample());
         assert_eq!(verify_err(&text), "line 4: not valid JSON");
+    }
+
+    #[test]
+    fn non_canonical_bytes_are_detected() {
+        let text = sample();
+        let forged = r#"{"message":{"jsonrpc":"2.0","id":1,"method":"FORGED"},"#;
+        let duplicate_key = text.replacen('{', forged, 1);
+        assert_eq!(verify_err(&duplicate_key), "line 1: not in canonical form");
+        let whitespace = text.replacen(",", ", ", 1);
+        assert_eq!(verify_err(&whitespace), "line 1: not in canonical form");
+        let crlf = text.replacen('\n', "\r\n", 1);
+        assert_eq!(verify_err(&crlf), "line 1: not in canonical form");
     }
 
     #[test]

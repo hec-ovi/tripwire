@@ -38,7 +38,10 @@
 - **Chained.** Each record stores the SHA-256 of its own canonical JSON
   (sorted keys, no whitespace, `hash` left out) and the previous record's
   hash. `verify` recomputes both and checks `seq` runs 0, 1, 2, ... so an
-  edit, deletion, insertion or reorder is reported at its line.
+  edit, deletion, insertion or reorder is reported at its line. Each line
+  must also be exactly that canonical JSON with `hash` added: a duplicate
+  key would let a first-wins reader see a different record than the one
+  that was hashed, the I1 trick applied to the log.
   `serde_json`'s `float_roundtrip` feature is on so that numbers re-serialize
   identically when the log is read back.
 - **One session, one file.** `run` refuses to open an existing log, so a

@@ -94,7 +94,9 @@ One JSON object per line, keys sorted:
 refused) or `rejected` (a line that was not forwarded, such as invalid JSON
 or a batch); those two carry a `reason`. `hash` is the SHA-256 of the record
 without `hash`, as compact JSON with sorted keys; `prev` is the previous
-record's hash, 64 zeros for the first.
+record's hash, 64 zeros for the first. `verify` requires every line to be
+exactly this serialization, so it also rejects bytes that parse to the same
+record, such as extra whitespace or a duplicate key.
 
 ## What it does not do
 
